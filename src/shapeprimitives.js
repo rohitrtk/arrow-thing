@@ -32,7 +32,7 @@ export const createCone = (radius, height, colour=0xffffff) => {
   const material = new THREE.MeshStandardMaterial({
     color: colour
   });
-
+  
   return new THREE.Mesh(geometry, material);
 }
 
