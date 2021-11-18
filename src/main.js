@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 
 import { createBox, createTorus, createCylinder, createCone } from './shapeprimitives';
 import { Arrow, TriArrow } from './arrow';
@@ -29,28 +30,18 @@ window.addEventListener('resize', event => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-window.addEventListener('keydown', event => {
-  const key = event.key;
-  console.log(event.key);
-  if(key === 'w') {
-    const direction = new THREE.Vector3();
-    camera.getWorldDirection(direction);
-    camera.position.add(direction);
-  }
-
-  if(key === 's') {
-    const direction = new THREE.Vector3();
-    camera.getWorldDirection(direction);
-    camera.position.sub(direction);
-  }
-});
-
 // Initial camera position
 camera.position.set(40, 40, 40);
 
-// Orbit controls
-const controls = new OrbitControls(camera, renderer.domElement);
-console.log(controls.keys);
+// Transform controls
+const orbitControls = new OrbitControls(camera, renderer.domElement);
+const transformControls = new TransformControls(camera, renderer.domElement);
+transformControls.addEventListener('mouseDown', event => {
+  orbitControls.enabled = false;
+});
+transformControls.addEventListener('mouseUp', event => {
+  orbitControls.enabled = true;
+});
 
 // Lighting
 const pointLight = new THREE.PointLight(0xffffff); 
@@ -61,17 +52,7 @@ scene.add(pointLight, ambientLight);
 // Shapes
 const torus = createTorus(10, 0x44aa88);
 scene.add(torus);
-torus.userData.draggable = true;
-
-const arrow = new Arrow();
-arrow.position.set(10, 0, 10);
-scene.add(arrow);
-arrow.userData.draggable = true;
-
-const tArrow = new TriArrow();
-tArrow.position.set(20, 0, 20);
-scene.add(tArrow);
-tArrow.userData.draggable = true;
+torus.userData.clickable = true;
 
 // Helpers
 const gridHelper = new THREE.GridHelper(200, 50);
@@ -84,11 +65,6 @@ const mouseMove = new THREE.Vector2();
 let selected = null;
 
 window.addEventListener('click', event => {
-  if(selected) {
-    selected = null;
-    return;
-  }
-
   mouseClick.x = (event.clientX / window.innerWidth) * 2 - 1;
   mouseClick.y = - (event.clientY / window.innerHeight) * 2 + 1;
   
@@ -96,19 +72,25 @@ window.addEventListener('click', event => {
   const intersected = raycaster.intersectObjects(scene.children, true);
   
   if(intersected.length === 0) {
+    transformControls.detach();
+    selected = null;
     return;
   }
 
-  console.log(intersected);
-
-  if(intersected[0].object.userData.draggable) {
-    selected = intersected[0].object;
-    //console.log(selected);
-  } else if(intersected[0].object.parent.userData.draggable) {
-    selected = intersected[0].object.parent;
-    //console.log(selected);
+  const i = intersected[0];
+  
+  if(selected && i !== selected) {
+    transformControls.detach();
+    selected = null;
+    return;
   }
-  //console.log(tArrow);
+
+  if(i.object.userData.clickable) {
+    selected = i.object;
+    
+    transformControls.attach(selected);
+    scene.add(transformControls);
+  }
 });
 
 window.addEventListener('mousemove', event => {
@@ -116,33 +98,13 @@ window.addEventListener('mousemove', event => {
   mouseMove.y = - (event.clientY / window.innerHeight) * 2 + 1;
 });
 
-const dragObject = () => {
-  if(selected !== null) {
-    raycaster.setFromCamera(mouseMove, camera);
-    const intersected = raycaster.intersectObjects(scene.children, true);
-    
-    if(intersected.length === 0) {
-      return;
-    }
-    
-    for(const obj of intersected) {
-      selected.position.x = obj.point.x;
-      selected.position.z = obj.point.z;
-    }
-  }
-}
-
 // Update function
 const update = (dt) => {
   torus.rotation.x += 1 * dt;
   torus.rotation.y += 1 * dt;
   torus.rotation.z += 1 * dt;
   
-  controls.update();
-
-  if(selected !== null) {
-    dragObject();
-  }
+  orbitControls.update();
 }
 
 // Main loop stuff
