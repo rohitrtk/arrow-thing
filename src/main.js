@@ -3,32 +3,40 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls';
 
 import { createBox, createTorus, createCylinder, createCone } from './shapeprimitives';
-import { Arrow, TriArrow } from './arrow';
 
 import './../style.css';
-import { CameraHelper } from 'three';
+
+// Html references
+const canvas = document.querySelector('.canvas');
 
 // Scene, camera, and renderer setup
+const scene = new THREE.Scene();
+const renderer = new THREE.WebGLRenderer({
+  canvas: canvas
+});
+renderer.setPixelRatio(window.devicePixelRatio);
+
 const fov   = 90;
 const near  = 0.1;
 const far   = 1000;
-const aspectRatio = window.innerWidth / window.innerHeight;
+const aspectRatio = canvas.width / canvas.height;
 
-const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(fov, aspectRatio, near, far);
-const renderer = new THREE.WebGLRenderer({
-  canvas: document.querySelector('#bg')
-});
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
 
-// Adjust camera aspect ratio and renderer when the window gets resized
-window.addEventListener('resize', event => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
+const resizeCanvas = () => {
+  const width   = canvas.clientWidth;
+  const height  = canvas.clientHeight;
 
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+  if(canvas.width !== width || canvas.height !== height) {
+    renderer.setSize(width, height, false);
+    camera.aspect = width / height;
+    camera.updateProjectionMatrix();
+  }
+}
+resizeCanvas();
+
+// When the window is resized, resize the canvas
+window.addEventListener('resize', resizeCanvas);
 
 // Initial camera position
 camera.position.set(40, 40, 40);
@@ -36,12 +44,15 @@ camera.position.set(40, 40, 40);
 // Transform controls
 const orbitControls = new OrbitControls(camera, renderer.domElement);
 const transformControls = new TransformControls(camera, renderer.domElement);
+let transformControlsClicked = false;
 transformControls.addEventListener('mouseDown', event => {
   orbitControls.enabled = false;
+  transformControlsClicked = true;
 });
 transformControls.addEventListener('mouseUp', event => {
   orbitControls.enabled = true;
 });
+scene.add(transformControls);
 
 // Lighting
 const pointLight = new THREE.PointLight(0xffffff); 
@@ -53,6 +64,7 @@ scene.add(pointLight, ambientLight);
 const torus = createTorus(10, 0x44aa88);
 scene.add(torus);
 torus.userData.clickable = true;
+//torus.userData.sceneExplorer = true;
 
 // Helpers
 const gridHelper = new THREE.GridHelper(200, 50);
@@ -61,41 +73,34 @@ scene.add(gridHelper, axesHelper);
 
 const raycaster = new THREE.Raycaster();
 const mouseClick = new THREE.Vector2();
-const mouseMove = new THREE.Vector2();
 let selected = null;
 
 window.addEventListener('click', event => {
-  mouseClick.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouseClick.y = - (event.clientY / window.innerHeight) * 2 + 1;
+  const width   = canvas.width;
+  const height  = canvas.height;
+
+  mouseClick.x = (event.clientX / width) * 2 - 1;
+  mouseClick.y = - (event.clientY / height) * 2 + 1;
   
   raycaster.setFromCamera(mouseClick, camera);
-  const intersected = raycaster.intersectObjects(scene.children, true);
-  
-  if(intersected.length === 0) {
-    transformControls.detach();
-    selected = null;
-    return;
-  }
+  const intersectArray = raycaster.intersectObjects(scene.children, true);
 
-  const i = intersected[0];
-  
-  if(selected && i !== selected) {
-    transformControls.detach();
-    selected = null;
-    return;
-  }
-
-  if(i.object.userData.clickable) {
-    selected = i.object;
+  for(let i = 0; i < intersectArray.length; i++) {
+    const intersected = intersectArray[i].object;
     
-    transformControls.attach(selected);
-    scene.add(transformControls);
+    if(intersected && intersected.userData.clickable) {
+      selected = intersected;
+      transformControls.attach(selected);
+      
+      break;
+    } else if(transformControlsClicked) {
+      transformControlsClicked = false;
+      break;
+    } else {
+      selected = null;
+      transformControls.detach();
+    }
   }
-});
-
-window.addEventListener('mousemove', event => {
-  mouseMove.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouseMove.y = - (event.clientY / window.innerHeight) * 2 + 1;
 });
 
 // Update function
@@ -119,3 +124,20 @@ const animate = () => {
 }
 
 animate();
+
+const createSceneHierachy = () => {
+  const hierachy = document.querySelector('.scene-hierarchy-list');
+
+  // Root
+  const rootElement = document.createElement('li');
+  rootElement.innerHTML = scene.constructor.name;
+  hierachy.appendChild(rootElement);
+
+  for(const object of scene.children) {
+    const listElement = document.createElement('li');
+    listElement.innerHTML = object.constructor.name;
+    hierachy.appendChild(listElement);
+  }
+}
+
+createSceneHierachy();
