@@ -11,6 +11,8 @@ const canvas = document.querySelector('.canvas');
 
 // Scene, camera, and renderer setup
 const scene = new THREE.Scene();
+scene.name = 'Scene';
+
 const renderer = new THREE.WebGLRenderer({
   canvas: canvas
 });
@@ -63,6 +65,7 @@ scene.add(pointLight, ambientLight);
 // Shapes
 const torus = createTorus(10, 0x44aa88);
 scene.add(torus);
+torus.name = 'Torus 1';
 torus.userData.clickable = true;
 //torus.userData.sceneExplorer = true;
 
@@ -128,15 +131,39 @@ animate();
 const createSceneHierachy = () => {
   const hierachy = document.querySelector('.scene-hierarchy-list');
 
-  // Root
-  const rootElement = document.createElement('li');
-  rootElement.innerHTML = scene.constructor.name;
-  hierachy.appendChild(rootElement);
+  const rootNode = scene;
+  if(!rootNode.userData.depth) {
+    rootNode.userData.depth = 0;
+  }
 
-  for(const object of scene.children) {
+  let stack = [];
+  stack.push(rootNode);
+
+  const SPACE = '&nbsp;';
+
+  while(stack.length > 0) {
+    const currentNode = stack.pop();
+    const nodeName = currentNode.name;
+
+    if(nodeName === '') {
+      continue;
+    }
+
+    const nodeDepth = currentNode.userData.depth;
+
     const listElement = document.createElement('li');
-    listElement.innerHTML = object.constructor.name;
+    listElement.innerHTML = `${SPACE.repeat(2 * nodeDepth)}${nodeName}`;
     hierachy.appendChild(listElement);
+
+    const children = currentNode.children;
+    const numChildren = children.length;
+
+    for(let i = numChildren - 1; i >= 0; i--) {
+      if(children[i]) {
+        children[i].userData.depth = nodeDepth + 1;
+        stack.push(children[i]);
+      }
+    }
   }
 }
 
